@@ -25,8 +25,13 @@ medved. Zvrhano zibelko sladkih hrušk mi je prinesel za en sam izdrt trn"."""
 # >>> find_words(test_text, 'de')
 # {'izdere', 'debel', 'oddide', 'začudeno'}
 ###############################################################################
+import re
+def find_words(text, substr):
+    expression = re.compile(r"\b[a-zA-Zčšž]*" + substr + r"[[a-zA-Zčšž]*\b")
+    x = re.findall(expression, text)
+    return set(x)
 
-
+print(find_words(test_text, 'de'))
 ###############################################################################
 # 2) Sestavite funkcijo [find_prefix], ki vrne množico vseh besed, ki se
 #    pojavijo v nizu in imajo dano predpono.
@@ -34,8 +39,12 @@ medved. Zvrhano zibelko sladkih hrušk mi je prinesel za en sam izdrt trn"."""
 # >>> find_prefix(test_text, 'zi')
 # {'zibala', 'zibel', 'zibelko'}
 ###############################################################################
+def find_prefix(text, substr):
+    expression = re.compile(r"\b" + substr + r"[a-zA-Zčšž]*\b")
+    x = re.findall(expression, text)
+    return set(x)   
 
-
+print(find_prefix(test_text, 'zi'))
 ###############################################################################
 # 3) Sestavite funkcijo [find_suffix], ki vrne množico vseh besed, ki se
 #    pojavijo v nizu in imajo dano pripono.
@@ -43,7 +52,12 @@ medved. Zvrhano zibelko sladkih hrušk mi je prinesel za en sam izdrt trn"."""
 # >>> find_suffix(test_text, 'la')
 # {'zibala', 'razveselila', 'prestrašila', 'šivala', 'opazila', 'tla'}
 ###############################################################################
+def find_suffix(text, substr):
+    expression = re.compile(r"\b[čšža-zA-Z]*" + substr + r"\b")
+    x = re.findall(expression, text)
+    return set(x)   
 
+print(find_suffix(test_text, 'la'))
 
 ###############################################################################
 # 4) Sestavite funkcijo [double_letters], ki sprejme niz in vrne množico vseh
@@ -52,3 +66,9 @@ medved. Zvrhano zibelko sladkih hrušk mi je prinesel za en sam izdrt trn"."""
 # >>> double_letters('A volunteer is worth twenty pressed men.')
 # {'volunteer', 'pressed'}
 ###############################################################################
+def double_letters(text):
+    expression = re.compile(r"(\b[čšža-zA-Z]*([čšža-zA-Z])\2[čšža-zA-Z]*\b)")
+    x = re.findall(expression, text)
+    return {i[0] for i in x}
+
+print(double_letters('A volunteer is worth twenty pressed men.'))
