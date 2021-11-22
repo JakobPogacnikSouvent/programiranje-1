@@ -232,10 +232,20 @@ let count_magic (w : wizard list) =
  - : string option = Some "Jaina"
 [*----------------------------------------------------------------------------*)
 
-let rec find_candidate (magic : magic) (spec : specialization) (wizard_list : wizard list) = 
-	match wizard_list with
-    | [] -> None
-    | wizard :: xs -> 
-    
-    match spec with
-    |
+let find_candidate (m : magic) (spec : specialization) (wizard_list : wizard list) = 
+    let years_needed (s : specialization) =
+        match s with
+        | Historian -> 3
+        | Teacher ->  5
+        | Researcher -> 4
+    in
+	let rec f (magic_type : magic) (spec : specialization) (wizard_list : wizard list) =
+        match wizard_list with
+        | [] -> None
+        | wizard :: xs -> 
+        	match wizard.status with
+            | Employed(magic_type, spec) -> Some wizard.name
+            | Student(magic_type, years) when years >= years_needed spec -> Some wizard.name
+            | _ -> f magic_type spec xs
+	in
+    f m spec wizard_list;;
