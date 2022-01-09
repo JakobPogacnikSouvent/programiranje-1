@@ -71,9 +71,13 @@ let boxes (grid : 'a grid) : 'a list list =
 
 let get_box (grid : 'a grid) (box_ind : int) = (boxes grid) |> n_th_item box_ind
 
-let get_box_of_field grid (row, col) =
+let get_box_of_coords (row, col) =
   let row_i = row / 3 and col_i = col / 3 in
-  get_box grid (row_i * 3 + col_i)
+  (row_i * 3 + col_i)
+
+let get_box_of_field grid (row, col) =
+  let b = get_box_of_coords (row, col) in
+  get_box grid b
 
 (* Funkcije za ustvarjanje novih mrež *)
 
@@ -177,6 +181,39 @@ let is_valid_solution problem solution =
 
 type available = { loc : int * int; possible : int list }
 
+let print_int_list (l : int list) =
+  let rec f =
+    function
+    | [] -> ()
+    | x :: [] -> print_int x;
+    | x :: xs -> 
+        print_int x;
+        print_string ";";
+        f xs
+  in
+  print_string "[";
+  f l;
+  print_string "]"
+
+let print_available (x : available) =
+  Printf.printf "loc=(%d, %d), possible=" (fst x.loc) (snd x.loc);
+  print_int_list x.possible;
+  print_string "\n"
+
+let print_available_list (l : available list) =
+  let rec f =
+    function
+    | [] -> ()
+    | x :: [] -> print_available x;
+    | x :: xs -> 
+        print_available x;
+        print_string ";";
+        f xs
+  in
+  print_string "[";
+  f l;
+  print_string "]"
+
 (* TODO: tip stanja ustrezno popravite, saj boste med reševanjem zaradi učinkovitosti
    želeli imeti še kakšno dodatno informacijo *)
 type state = { problem : problem; current_grid : int option grid; current_available : available list; last_move : int option * int option}
@@ -188,16 +225,49 @@ let print_state (state : state) : unit =
 
 type response = Solved of solution | Unsolved of state | Fail of state
 
+let remove_available (n : int) ((row, col) : int * int) (current_available : available list) =
+  (* Give digit and coords and the function will remove invalid occurences of it from current_available digits *)
+
+  let remove (m : int) (l : int list) =
+  (* Removes m from list *)
+  List.filter (function x -> x<>m) l
+  in
+
+  let rec f acc =
+  function
+  | [] -> acc
+  | x :: xs -> (
+    match x.loc with
+    (* If we are in the same row and col remove all available *)
+    | (a, b) when a = row && b = col -> f acc xs
+    (* If in same row, collumn or box remove digit from available *)
+    | (a, b) when a = row || b = col || (get_box_of_coords (a,b)) = (get_box_of_coords (row, col)) -> f ({loc=x.loc; possible=remove n x.possible} :: acc) xs
+    (* Else pass *)
+    | _ -> f (x :: acc) xs
+  )
+  in
+  f [] current_available
+
+
 let initialize_state (problem : problem) : state =
   let grid_copy = copy_grid problem.initial_grid in
   let to_check = ref [] in
+  let filled_in = ref [] in
   for row = 0 to 8 do
     for col = 0 to 8 do
-      if grid_copy.(row).(col) = None then
+      let n = grid_copy.(row).(col) in
+      if n = None then
         to_check := {loc=(row, col); possible=[1;2;3;4;5;6;7;8;9]} :: !to_check
+      else
+        filled_in := ((Option.get n), (row, col)) :: !filled_in
     done;
   done;
-  {current_grid = grid_copy; problem; current_available = !to_check; last_move=(None, None)}
+  let rec f available = 
+  function
+  | [] -> available
+  | x :: xs -> f (remove_available (fst x) (snd x) available) xs
+  in
+  {current_grid = grid_copy; problem; current_available = f !to_check !filled_in; last_move=(None, None)}
 
 let validate_state (state : state) : response =
   let unsolved =
@@ -215,21 +285,91 @@ let is_valid_last_move (state : state) : bool =
   match state.last_move with
   | (None, None) -> true (* If there was no previus move the move is valid *)
   | (Some row, Some col) ->
-    (* print_int row;
-    print_int col; *)
     get_row state.current_grid row |> no_duplicates_in_option_list && get_column state.current_grid col |> no_duplicates_in_option_list && get_box_of_field state.current_grid (row, col) |> no_duplicates_in_option_list 
   | _ -> failwith "Invalid state"
 
-let branch_state (state : state) : (state * state) option =
-  (* TODO: Pripravite funkcijo, ki v trenutnem stanju poišče hipotezo, glede katere
-     se je treba odločiti. Če ta obstaja, stanje razveji na dve stanji:
-     v prvem predpostavi, da hipoteza velja, v drugem pa ravno obratno.
-     Če bo vaš algoritem najprej poizkusil prvo možnost, vam morda pri drugi
-     za začetek ni treba zapravljati preveč časa, saj ne bo nujno prišla v poštev. *)
-  match state.current_available with
+let remove_available_from_last_move (state : state) : state =
+  match state.last_move with
+  | (None, None) -> state
+  | (Some row, Some col) ->
+    let n = state.current_grid.(row).(col) |> Option.get in
+    let available' = remove_available n (row, col) state.current_available in
+    {problem = state.problem; current_grid = state.current_grid; current_available = available'; last_move=(Some row, Some col)}
+  | _ -> failwith "Invalid state"
+
+let branch_state' (state : state) : (state * state) option =
+  let min_and_rest (l : available list) : (available * available list) =
+    (* Finds square with least possible branching options *)
+    let rec f min rest =
+    function
+    | [] -> (min, rest)
+    | x :: xs ->
+      if (List.length x.possible) < (List.length min.possible) then
+        f x (min :: rest) xs
+      else
+        f min (x :: rest) xs
+    in
+    f (List.hd l) [] (List.tl l)
+  in
   (* If there are no more squares to check we cannot branch *)
-  | [] -> None
-  | x :: xs ->(
+  if state.current_available = [] then
+    None
+  else
+    let best_square, rest = min_and_rest state.current_available in
+
+    match best_square.possible with
+    | [] -> failwith "No more branching possibilities in branch_state."
+    | n :: ns ->(
+      let row, col = best_square.loc in
+      let first_state_grid = copy_grid state.current_grid in
+      first_state_grid.(row).(col) <- Some n;
+      let first_state = {problem = state.problem; current_grid = first_state_grid; current_available = rest; last_move=(Some row, Some col)} in
+      match ns with
+      (* If there is only 1 possible digit in square after trying first the second branch can be initialized with said digit in square *)
+       | m :: [] ->
+        let second_state_grid = copy_grid state.current_grid in
+        second_state_grid.(row).(col) <- Some m;
+        let second_state = {problem = state.problem; current_grid = second_state_grid; current_available = rest; last_move=(Some row, Some col)} in
+        Some (first_state, second_state)
+      (* If there are more than 1 possible digits in square after trying first remove first digit from possible digits in second branch *)
+       | m :: ms -> 
+        let second_state = {problem = state.problem; current_grid = copy_grid state.current_grid; current_available = {loc = best_square.loc; possible = (m :: ms)} :: rest; last_move=(None, None)} in
+        Some (first_state, second_state)
+       | [] -> failwith "Shouldn't reach this possibility as we find naked singles before branching"
+      )
+
+let branch_state (state : state) : (state * state) option =
+  let min_and_rest (l : available list) : (available * available list) =
+    (* Finds square with least possible branching options *)
+    let rec f min rest =
+    function
+    | [] -> (min, rest)
+    | x :: xs ->
+      if (List.length x.possible) < (List.length min.possible) then
+        f x (min :: rest) xs
+      else
+        f min (x :: rest) xs
+    in
+    f (List.hd l) [] (List.tl l)
+  in
+
+
+  if state.current_available = [] then
+    (* If there are no more squares to check we cannot branch *)
+    None
+  else
+    let x = List.hd state.current_available in
+    let xs = List.tl state.current_available in
+
+    let best_square, rest = min_and_rest state.current_available in
+    print_string "~~~~~~~~~~~\n";
+    print_available x;
+    print_available_list xs;
+    print_string "------------\n";
+    print_available best_square;
+    print_available_list rest;
+    print_string "~~~~~~~~~~~\n";
+    
     match x.possible with
     | n :: ns ->(
       let row, col = x.loc in
@@ -248,7 +388,23 @@ let branch_state (state : state) : (state * state) option =
        | [] -> failwith "Shouldn't reach this possibility as we delete lists when they have 1 elt left"
       )
     | [] -> failwith "Reached invalid state of possibilities in branch_state."
-  )
+
+let naked_singles (state : state) : response option =
+  (* Returns None if there are no naked singles and new state if there are naked singles *)
+  let rec f acc =
+  function
+  | [] -> None
+  | square :: rest ->
+    match square.possible with
+    | [] -> Some (Fail state)
+    | n :: [] -> (
+      let row, col = square.loc in
+      state.current_grid.(row).(col) <- Some n;
+      Some (Unsolved {problem = state.problem; current_grid = state.current_grid; current_available = (acc @ rest); last_move=(Some row, Some col)})
+      )
+    | _ -> f (square :: acc) rest
+  in
+  f [] state.current_available
 
 (* pogledamo, če trenutno stanje vodi do rešitve *)
 let rec solve_state (state : state) =
@@ -256,15 +412,29 @@ let rec solve_state (state : state) =
   (* TODO: na tej točki je stanje smiselno počistiti in zožiti možne rešitve *)
   if is_valid_last_move state then
     match validate_state state with
-    | Solved solution ->
-        (* če smo našli rešitev, končamo *)
-        Some solution
-    | Fail fail ->
-        (* prav tako končamo, če smo odkrili, da rešitev ni *)
-        None
-    | Unsolved state' ->
-        (* če še nismo končali, raziščemo stanje, v katerem smo končali *)
-        explore_state state'
+        | Solved solution ->
+            (* če smo našli rešitev, končamo *)
+            Some solution
+        | Fail fail ->
+            (* prav tako končamo, če smo odkrili, da rešitev ni *)
+            None
+        | Unsolved state' ->
+            (* če še nismo končali, raziščemo stanje, v katerem smo končali *)
+            
+            (* Zožimo rešitve *)
+            let state'' = remove_available_from_last_move state' in
+            
+
+            (* Preverimo če obstaja polje s samo eno možnostjo *)
+            match naked_singles state'' with
+              (* Če da vstavimo številko *)
+              | Some (Unsolved state''') -> solve_state state'''
+              (* Če najdemo polje brez možnosti končamo *)
+              | Some (Fail state''') -> None
+              (* Če ne nadaljujemo z branchanjem *)
+              | None -> explore_state state
+              (* Shouldn't happen *)
+              | Some (Solved solution) -> Some solution 
   else
     None
 
@@ -315,7 +485,7 @@ let find_and_display_solution (problem : problem) =
   display_solution response;
   Printf.printf "Čas reševanja: %f s.\n%!" elapsed_time
 
-let () =
+(* let () =
   let before = Sys.time () in
   (* Če se program sesuje, nam to izpiše klicni sklad. *)
   Printexc.record_backtrace true;
@@ -332,31 +502,30 @@ let () =
   let after = Sys.time () in
   let elapsed_time = after -. before in
   print_string "\n";
-  print_float elapsed_time
+  print_float elapsed_time *)
 
 (* Če domačo nalogo rešujete prek spletnega vmesnika, ki ne podpira branja datotek,
    lahko delovanje preizkušate prek spodnjega programa. *)
 
-(* let () = "
+let () = "
 ┏━━━┯━━━┯━━━┓
-┃   │9  │  2┃
-┃ 5 │123│4  ┃
-┃ 3 │   │16 ┃
+┃ 1 │5  │2  ┃
+┃9  │  1│   ┃
+┃  2│  8│ 3 ┃
 ┠───┼───┼───┨
-┃9 8│   │   ┃
-┃ 7 │   │ 9 ┃
-┃   │   │2 5┃
+┃5  │ 3 │  7┃
+┃  8│   │5  ┃
+┃6  │ 8 │  4┃
 ┠───┼───┼───┨
-┃ 91│   │ 5 ┃
-┃  7│439│ 2 ┃
-┃4  │  7│   ┃
+┃ 4 │1  │7  ┃
+┃   │7  │  6┃
+┃  3│  4│ 5 ┃
 ┗━━━┷━━━┷━━━┛" 
   |> problem_of_string
-  |> find_and_display_solution *)
+  |> find_and_display_solution
 
 
 (* 
-"
 ┏━━━┯━━━┯━━━┓
 ┃483│921│657┃
 ┃967│345│821┃
@@ -369,9 +538,8 @@ let () =
 ┃372│689│514┃
 ┃814│253│769┃
 ┃695│417│382┃
-┗━━━┷━━━┷━━━┛" 
+┗━━━┷━━━┷━━━┛
 
-"
 ┏━━━┯━━━┯━━━┓
 ┃   │   │   ┃
 ┃   │   │   ┃
@@ -384,6 +552,18 @@ let () =
 ┃   │   │   ┃
 ┃   │   │   ┃
 ┃   │   │   ┃
-┗━━━┷━━━┷━━━┛" 
-
+┗━━━┷━━━┷━━━┛
+┏━━━┯━━━┯━━━┓
+┃ 1 │5  │2  ┃
+┃9  │  1│   ┃
+┃  2│  8│ 3 ┃
+┠───┼───┼───┨
+┃5  │ 3 │  7┃
+┃  8│   │5  ┃
+┃6  │ 8 │  4┃
+┠───┼───┼───┨
+┃ 4 │1  │7  ┃
+┃   │7  │  6┃
+┃  3│  4│ 5 ┃
+┗━━━┷━━━┷━━━┛
 *)
