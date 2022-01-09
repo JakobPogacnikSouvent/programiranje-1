@@ -61,6 +61,7 @@ let rec n_th_item n =
         | y -> n_th_item (n-1) xs
 
 let boxes (grid : 'a grid) : 'a list list =
+(* Lets have some fun *)
   grid |> rows |> List.map (chunkify 3) |> chunkify 3
   |> List.map (function l -> [
       l |> List.map (n_th_item 0) |> List.fold_left (@) [];
@@ -86,8 +87,7 @@ let map_grid (f : 'a -> 'b) (grid : 'a grid) : 'b grid =
 
 let copy_grid (grid : 'a grid) : 'a grid = map_grid (fun x -> x) grid
 
-let foldi_grid (f : int -> int -> 'a -> 'acc -> 'acc) (grid : 'a grid)
-    (acc : 'acc) : 'acc =
+let foldi_grid (f : int -> int -> 'a -> 'acc -> 'acc) (grid : 'a grid) (acc : 'acc) : 'acc =
   let acc, _ =
     Array.fold_left
       (fun (acc, row_ind) row ->
@@ -144,7 +144,7 @@ type solution = int grid
 let print_solution solution = print_problem {initial_grid = (map_grid (function x -> Some x) solution)}
 
 let no_duplicates_in_list (l : int list) =
-  (* Checks if list contains all digits from 1 to length of list *)
+  (* Checks if list of len n contains any duplicate digits between 0 and n-1 *)
   let seen = Array.make (List.length l) false in
   let rec f =
     function
@@ -159,6 +159,7 @@ let no_duplicates_in_list (l : int list) =
   f l
 
 let no_duplicates_in_option_list (l : int option list) =
+ (* Same as above but works with option list discarding None options *)
   let seen = Array.make (List.length l) false in
   let rec f =
     function
@@ -176,11 +177,12 @@ let no_duplicates_in_option_list (l : int option list) =
   f l
 
 let is_valid_solution problem solution =
-  (* Check regular sudoku rules *)
+  (* Checks if a solution is valid following regular sudoku rules *)
   (columns solution) @ (rows solution) @ (boxes solution) |> List.filter no_duplicates_in_list |> List.length |> (=) 27
 
 type available = { loc : int * int; possible : int list }
 
+(* Debugging functions *)
 let print_int_list (l : int list) =
   let rec f =
     function
@@ -213,9 +215,8 @@ let print_available_list (l : available list) =
   print_string "[";
   f l;
   print_string "]"
+(* End of debugging functions *)
 
-(* TODO: tip stanja ustrezno popravite, saj boste med reševanjem zaradi učinkovitosti
-   želeli imeti še kakšno dodatno informacijo *)
 type state = { problem : problem; current_grid : int option grid; current_available : available list; last_move : int option * int option}
 
 let print_state (state : state) : unit =
@@ -226,8 +227,8 @@ let print_state (state : state) : unit =
 type response = Solved of solution | Unsolved of state | Fail of state
 
 let remove_available (n : int) ((row, col) : int * int) (current_available : available list) =
-  (* Give digit and coords and the function will remove invalid occurences of it from current_available digits *)
-
+  (* Removes all available digits that will immediately result in an invalid state given a digit n in coords row, col *)
+  
   let remove (m : int) (l : int list) =
   (* Removes m from list *)
   List.filter (function x -> x<>m) l
@@ -253,20 +254,26 @@ let initialize_state (problem : problem) : state =
   let grid_copy = copy_grid problem.initial_grid in
   let to_check = ref [] in
   let filled_in = ref [] in
+  (* Iterate grid and create initial available digits*)
   for row = 0 to 8 do
     for col = 0 to 8 do
       let n = grid_copy.(row).(col) in
       if n = None then
+        (* If square is empty all digits are possible here *)
         to_check := {loc=(row, col); possible=[1;2;3;4;5;6;7;8;9]} :: !to_check
       else
+        (* If square is not empty we save it so to narrow down tries *)
         filled_in := ((Option.get n), (row, col)) :: !filled_in
     done;
   done;
+
   let rec f available = 
+  (* Narrows down tries given filled in digits *)
   function
   | [] -> available
   | x :: xs -> f (remove_available (fst x) (snd x) available) xs
   in
+
   {current_grid = grid_copy; problem; current_available = f !to_check !filled_in; last_move=(None, None)}
 
 let validate_state (state : state) : response =
@@ -281,16 +288,22 @@ let validate_state (state : state) : response =
     else Fail state
 
 let is_valid_last_move (state : state) : bool =
-  (* print_state state; *)
   match state.last_move with
-  | (None, None) -> true (* If there was no previus move the move is valid *)
+  (* If there was no previus move the move is valid *)
+  | (None, None) -> true
+  (* If there was a previus move check that it did not produce duplicates in rows, boxes or columns *)
   | (Some row, Some col) ->
     get_row state.current_grid row |> no_duplicates_in_option_list && get_column state.current_grid col |> no_duplicates_in_option_list && get_box_of_field state.current_grid (row, col) |> no_duplicates_in_option_list 
+  (* This state should not be reached *)
   | _ -> failwith "Invalid state"
 
 let remove_available_from_last_move (state : state) : state =
+  (* Looks at last move and removes all available digits that will immediately result in an invalid state *)
+  
   match state.last_move with
+  (* If there was no last move do nothing *)
   | (None, None) -> state
+  (* If there was a last move build a new grid after removing invalid available digits *)
   | (Some row, Some col) ->
     let n = state.current_grid.(row).(col) |> Option.get in
     let available' = remove_available n (row, col) state.current_available in
@@ -298,119 +311,116 @@ let remove_available_from_last_move (state : state) : state =
   | _ -> failwith "Invalid state"
 
 let branch_state' (state : state) : (state * state) option =
-  let min_and_rest (l : available list) : (available * available list) =
-    (* Finds square with least possible branching options *)
-    let rec f min rest =
+  (*
+  This function was supposed to find the square with least possible branching options and branch from there but for some reason it doesn't work properly.
+  It gets stuck on regular 44 and 47 and takes more time then other branch function with 49.
+  If you can figure out why this is the case pretty please tell me, I have wasted hours on this instead of solving thermometers.
+   *)
+  let min_and_rest (list : available list) =
+    let rec f (min : available) (rest : available list) =
     function
     | [] -> (min, rest)
     | x :: xs ->
-      if (List.length x.possible) < (List.length min.possible) then
+      if List.length x.possible < List.length min.possible then
         f x (min :: rest) xs
       else
         f min (x :: rest) xs
     in
-    f (List.hd l) [] (List.tl l)
+    f (List.hd list) [] (List.tl list)
   in
-  (* If there are no more squares to check we cannot branch *)
   if state.current_available = [] then
     None
   else
     let best_square, rest = min_and_rest state.current_available in
-
     match best_square.possible with
-    | [] -> failwith "No more branching possibilities in branch_state."
-    | n :: ns ->(
+    | [] -> failwith "This state should have been pruned beforehand"
+    | n :: [] -> failwith "Naked singles should have been found beforehand"
+    | n :: m :: [] -> 
       let row, col = best_square.loc in
+      
       let first_state_grid = copy_grid state.current_grid in
       first_state_grid.(row).(col) <- Some n;
-      let first_state = {problem = state.problem; current_grid = first_state_grid; current_available = rest; last_move=(Some row, Some col)} in
-      match ns with
-      (* If there is only 1 possible digit in square after trying first the second branch can be initialized with said digit in square *)
-       | m :: [] ->
-        let second_state_grid = copy_grid state.current_grid in
-        second_state_grid.(row).(col) <- Some m;
-        let second_state = {problem = state.problem; current_grid = second_state_grid; current_available = rest; last_move=(Some row, Some col)} in
-        Some (first_state, second_state)
-      (* If there are more than 1 possible digits in square after trying first remove first digit from possible digits in second branch *)
-       | m :: ms -> 
-        let second_state = {problem = state.problem; current_grid = copy_grid state.current_grid; current_available = {loc = best_square.loc; possible = (m :: ms)} :: rest; last_move=(None, None)} in
-        Some (first_state, second_state)
-       | [] -> failwith "Shouldn't reach this possibility as we find naked singles before branching"
-      )
+      let first_state = {problem=state.problem; current_grid=first_state_grid; current_available=rest; last_move=(Some row, Some col)} in
+
+      let second_state_grid = copy_grid state.current_grid in
+      second_state_grid.(row).(col) <- Some m;
+      let second_state = {problem=state.problem; current_grid=second_state_grid; current_available=rest; last_move=(Some row, Some col)} in
+      
+      Some (first_state, second_state)
+    | n :: ns ->
+      let row, col = best_square.loc in
+      
+      let first_state_grid = copy_grid state.current_grid in
+      first_state_grid.(row).(col) <- Some n;
+      let first_state = {problem=state.problem; current_grid=first_state_grid; current_available=rest; last_move=(Some row, Some col)} in
+
+      let second_state = {problem=state.problem; current_grid=(copy_grid state.current_grid); current_available= ({loc=(row, col); possible=ns}) :: rest; last_move=state.last_move} in
+      Some (first_state, second_state)
 
 let branch_state (state : state) : (state * state) option =
-  let min_and_rest (l : available list) : (available * available list) =
-    (* Finds square with least possible branching options *)
-    let rec f min rest =
-    function
-    | [] -> (min, rest)
-    | x :: xs ->
-      if (List.length x.possible) < (List.length min.possible) then
-        f x (min :: rest) xs
-      else
-        f min (x :: rest) xs
-    in
-    f (List.hd l) [] (List.tl l)
-  in
-
-
   if state.current_available = [] then
     (* If there are no more squares to check we cannot branch *)
     None
   else
+    (* Take first possible square and rest *)
     let x = List.hd state.current_available in
     let xs = List.tl state.current_available in
-
-    let best_square, rest = min_and_rest state.current_available in
-    print_string "~~~~~~~~~~~\n";
-    print_available x;
-    print_available_list xs;
-    print_string "------------\n";
-    print_available best_square;
-    print_available_list rest;
-    print_string "~~~~~~~~~~~\n";
     
     match x.possible with
+    (* Get digits in square *)
     | n :: ns ->(
       let row, col = x.loc in
       let first_state_grid = copy_grid state.current_grid in
       first_state_grid.(row).(col) <- Some n;
       let first_state = {problem = state.problem; current_grid = first_state_grid; current_available = xs; last_move=(Some row, Some col)} in
+      
+      (* Check whether there are more digits available *)
       match ns with
+       (* If there is only 1 available put it in second state *)
        | m :: [] ->
         let second_state_grid = copy_grid state.current_grid in
         second_state_grid.(row).(col) <- Some m;
         let second_state = {problem = state.problem; current_grid = second_state_grid; current_available = xs; last_move=(Some row, Some col)} in
         Some (first_state, second_state)
+       (* If there is more than 1 available remove first digit from second state *)
        | m :: ms -> 
         let second_state = {problem = state.problem; current_grid = copy_grid state.current_grid; current_available = {loc = x.loc; possible = (m :: ms)} :: xs; last_move=(None, None)} in
         Some (first_state, second_state)
-       | [] -> failwith "Shouldn't reach this possibility as we delete lists when they have 1 elt left"
+       (* There never should be a cell with only 1 digit available as we fill those in before branching *)
+       | [] -> failwith "Naked singles should have been found beforehand"
       )
+    (* There never should be a square with no digits as we kill those states before branching *)
     | [] -> failwith "Reached invalid state of possibilities in branch_state."
 
 let naked_singles (state : state) : response option =
-  (* Returns None if there are no naked singles and new state if there are naked singles *)
+  (* Returns None if there are no naked singles and a new state if there are naked singles.
+     If it finds a square with no possible digits it returns a fail state.
+   *)
   let rec f acc =
   function
   | [] -> None
   | square :: rest ->
     match square.possible with
+    (* If we find a square with no possible digits return Fail state *)
     | [] -> Some (Fail state)
+    (* If we find a square with a single possible digit we fill it in *)
     | n :: [] -> (
       let row, col = square.loc in
       state.current_grid.(row).(col) <- Some n;
       Some (Unsolved {problem = state.problem; current_grid = state.current_grid; current_available = (acc @ rest); last_move=(Some row, Some col)})
       )
+    (* Otherwise we loop *)
     | _ -> f (square :: acc) rest
   in
   f [] state.current_available
 
 (* pogledamo, če trenutno stanje vodi do rešitve *)
 let rec solve_state (state : state) =
-  (* uveljavimo trenutne omejitve in pogledamo, kam smo prišli *)
-  (* TODO: na tej točki je stanje smiselno počistiti in zožiti možne rešitve *)
+
+  (* Check if last move resulted in an invalid state (duplicate in row, colum, box) *)
   if is_valid_last_move state then
+
+    (* Check if state is solved *)
     match validate_state state with
         | Solved solution ->
             (* če smo našli rešitev, končamo *)
@@ -421,19 +431,22 @@ let rec solve_state (state : state) =
         | Unsolved state' ->
             (* če še nismo končali, raziščemo stanje, v katerem smo končali *)
             
-            (* Zožimo rešitve *)
+            (* Prune possible guesses that are not valid due to last move *)
             let state'' = remove_available_from_last_move state' in
             
 
-            (* Preverimo če obstaja polje s samo eno možnostjo *)
+            (* Check if we can create a valid state by inputing a single digit *)
             match naked_singles state'' with
-              (* Če da vstavimo številko *)
+              (* If yes we return to solve_state *)
               | Some (Unsolved state''') -> solve_state state'''
-              (* Če najdemo polje brez možnosti končamo *)
-              | Some (Fail state''') -> None
-              (* Če ne nadaljujemo z branchanjem *)
+              
+              (* If no such valid state can be found we branch *)
               | None -> explore_state state
-              (* Shouldn't happen *)
+
+              (* If we happen to find a state with no possible guesses we fail *)
+              | Some (Fail state''') -> None
+
+              (* Shouldn't happen as we check if we are solved beforehand *)
               | Some (Solved solution) -> Some solution 
   else
     None
@@ -485,7 +498,7 @@ let find_and_display_solution (problem : problem) =
   display_solution response;
   Printf.printf "Čas reševanja: %f s.\n%!" elapsed_time
 
-(* let () =
+let () =
   let before = Sys.time () in
   (* Če se program sesuje, nam to izpiše klicni sklad. *)
   Printexc.record_backtrace true;
@@ -502,27 +515,27 @@ let find_and_display_solution (problem : problem) =
   let after = Sys.time () in
   let elapsed_time = after -. before in
   print_string "\n";
-  print_float elapsed_time *)
+  print_float elapsed_time
 
 (* Če domačo nalogo rešujete prek spletnega vmesnika, ki ne podpira branja datotek,
    lahko delovanje preizkušate prek spodnjega programa. *)
 
-let () = "
+(* let () = "
 ┏━━━┯━━━┯━━━┓
-┃ 1 │5  │2  ┃
-┃9  │  1│   ┃
-┃  2│  8│ 3 ┃
+┃  4│   │   ┃
+┃   │ 3 │  2┃
+┃39 │7  │ 8 ┃
 ┠───┼───┼───┨
-┃5  │ 3 │  7┃
-┃  8│   │5  ┃
-┃6  │ 8 │  4┃
+┃4  │  9│  1┃
+┃2 9│8 1│3 7┃
+┃6  │2  │  8┃
 ┠───┼───┼───┨
-┃ 4 │1  │7  ┃
-┃   │7  │  6┃
-┃  3│  4│ 5 ┃
+┃ 1 │  8│ 53┃
+┃9  │ 4 │   ┃
+┃   │   │8  ┃
 ┗━━━┷━━━┷━━━┛" 
   |> problem_of_string
-  |> find_and_display_solution
+  |> find_and_display_solution *)
 
 
 (* 
