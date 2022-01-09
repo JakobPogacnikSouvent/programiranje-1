@@ -9,7 +9,7 @@
                 "isDefault": true
             },
             "windows": {
-                "command": "C:\\OCaml64\\usr\\local\\bin\\ocaml-env.exe exec -- C:\\OCaml64\\home\\Jakob\\.opam\\4.12.0+mingw64c\\bin\\ocamlopt.exe .\\hotfix.ml -o a.exe"
+                "command": "C:\\OCaml64\\usr\\local\\bin\\ocaml-env.exe exec -- C:\\OCaml64\\home\\Jakob\\.opam\\4.12.0+mingw64c\\bin\\ocamlopt.exe .\\hotfix.ml -O2 -o a.exe"
                 }
         },
         {
