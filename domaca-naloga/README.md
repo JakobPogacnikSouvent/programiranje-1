@@ -1,3 +1,16 @@
+# Kako zagnati
+
+Program zaženeš tako da skompilaš datoteko `hotfix.ml` v kateri je vsa koda skupaj ker mi na začetku spodnja navodila niso delovala.
+Na mojem računalniku se program skompila z
+
+      C:\OCaml64\usr\local\bin\ocaml-env.exe exec -- C:\OCaml64\home\???\.opam\4.12.0+mingw64c\bin\ocamlopt.exe .\hotfix.ml -O2 -o a.exe
+
+in požene kot
+
+      .\a.exe .\sudokuji\obicajni-*.sdk
+      
+po potrebi lahko popraviš ustrezni funkciji v `tasks.json`.
+      
 # Domača naloga
 
 Domača naloga od vas zahteva da napišete program, ki reši uganko [sudoku](https://sl.wikipedia.org/wiki/Sudoku). Osnovno ogrodje smo vam že pripravili, samo pa morate dokončati nekaj manjkajočih delov in izboljšati učinkovitost reševanja. Za več točk se od vas pričakuje, da boste nekatere že pripravljene funkcije popravili in dodali zmožnost reševanja nestandardnih sudokujev. Poleg pravilnega in učinkovitega delovanja se pričakuje, da bo programska koda berljiva. To ne pomeni samo tega, da so spremenljivke ustrezno poimenovane, koda lepo zamaknjena, zahtevnejši deli pa pokomentirani, temveč tudi to, da je program napišete v duhu funkcijskega programiranja.
