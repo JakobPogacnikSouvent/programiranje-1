@@ -9,7 +9,7 @@
                 "isDefault": true
             },
             "windows": {
-                "command": "C:\\OCaml64\\usr\\local\\bin\\ocaml-env.exe exec -- C:\\OCaml64\\home\\Jakob\\.opam\\4.12.0+mingw64c\\bin\\ocamlc.exe -g model.ml solver.ml main.ml -o sudoku.exe"
+                "command": "C:\\OCaml64\\usr\\local\\bin\\ocaml-env.exe exec -- C:\\OCaml64\\home\\Jakob\\.opam\\4.12.0+mingw64c\\bin\\ocamlopt.exe .\\hotfix.ml -o a.exe"
                 }
         },
         {
@@ -20,7 +20,7 @@
                 "isDefault": true
             },
             "windows": {
-                "command": "start sudoku.exe sudokuji/*.sdk"
+                "command": ".\\a.exe .\\sudokuji\\obicajni-*.sdk"
                 }   
         },
         {

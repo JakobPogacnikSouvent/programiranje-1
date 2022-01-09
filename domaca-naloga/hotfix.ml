@@ -218,6 +218,7 @@ let is_valid_last_move (state : state) : bool =
     (* print_int row;
     print_int col; *)
     get_row state.current_grid row |> no_duplicates_in_option_list && get_column state.current_grid col |> no_duplicates_in_option_list && get_box_of_field state.current_grid (row, col) |> no_duplicates_in_option_list 
+  | _ -> failwith "Invalid state"
 
 let branch_state (state : state) : (state * state) option =
   (* TODO: Pripravite funkcijo, ki v trenutnem stanju poišče hipotezo, glede katere
@@ -228,24 +229,26 @@ let branch_state (state : state) : (state * state) option =
   match state.current_available with
   (* If there are no more squares to check we cannot branch *)
   | [] -> None
-  | x :: xs ->
+  | x :: xs ->(
     match x.possible with
-    | n :: ns ->
+    | n :: ns ->(
       let row, col = x.loc in
       let first_state_grid = copy_grid state.current_grid in
       first_state_grid.(row).(col) <- Some n;
       let first_state = {problem = state.problem; current_grid = first_state_grid; current_available = xs; last_move=(Some row, Some col)} in
       match ns with
-      | m :: [] ->
+       | m :: [] ->
         let second_state_grid = copy_grid state.current_grid in
         second_state_grid.(row).(col) <- Some m;
         let second_state = {problem = state.problem; current_grid = second_state_grid; current_available = xs; last_move=(Some row, Some col)} in
         Some (first_state, second_state)
-      | m :: ms -> 
+       | m :: ms -> 
         let second_state = {problem = state.problem; current_grid = copy_grid state.current_grid; current_available = {loc = x.loc; possible = (m :: ms)} :: xs; last_move=(None, None)} in
         Some (first_state, second_state)
-      | [] -> failwith "Shouldn't reach this possibility as we delete lists when they have 1 elt left"
-    | _ -> failwith "Reached invalid state of possibilities in branch_state."
+       | [] -> failwith "Shouldn't reach this possibility as we delete lists when they have 1 elt left"
+      )
+    | [] -> failwith "Reached invalid state of possibilities in branch_state."
+  )
 
 (* pogledamo, če trenutno stanje vodi do rešitve *)
 let rec solve_state (state : state) =
@@ -286,7 +289,8 @@ let solve_problem (problem : problem) =
 
 let read_problem filename =
   let channel = open_in filename in
-  let str = really_input_string channel (in_channel_length channel) in
+  (* Ne zna brat posebnih *)
+  let str = really_input_string channel (320) in
   close_in channel;
   problem_of_string str
 
@@ -311,7 +315,8 @@ let find_and_display_solution (problem : problem) =
   display_solution response;
   Printf.printf "Čas reševanja: %f s.\n%!" elapsed_time
 
-(* let () =
+let () =
+  let before = Sys.time () in
   (* Če se program sesuje, nam to izpiše klicni sklad. *)
   Printexc.record_backtrace true;
   (* Tabela sistemskih argumentov vsebuje ime klicanega programa ter argumente, ki mu sledijo *)
@@ -323,12 +328,16 @@ let find_and_display_solution (problem : problem) =
   (* Iz vsake datoteke preberemo problem *)
   |> List.map read_problem
   (* Probleme zaporedoma rešimo *)
-  |> List.iter find_and_display_solution *)
+  |> List.iter find_and_display_solution;
+  let after = Sys.time () in
+  let elapsed_time = after -. before in
+  print_string "\n";
+  print_float elapsed_time
 
 (* Če domačo nalogo rešujete prek spletnega vmesnika, ki ne podpira branja datotek,
    lahko delovanje preizkušate prek spodnjega programa. *)
 
-let () = "
+(* let () = "
 ┏━━━┯━━━┯━━━┓
 ┃   │9  │  2┃
 ┃ 5 │123│4  ┃
@@ -343,7 +352,7 @@ let () = "
 ┃4  │  7│   ┃
 ┗━━━┷━━━┷━━━┛" 
   |> problem_of_string
-  |> find_and_display_solution
+  |> find_and_display_solution *)
 
 
 (* 

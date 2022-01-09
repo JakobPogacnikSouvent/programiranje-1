@@ -136,3 +136,8 @@ Pri branju vse vrstice, ki se začnejo z `#`, ignorirajte kot komentarje.
 Domačo nalogo rešujete na svojem klonu repozitorija predmeta. Priporočamo, da nalogo rešujete v posebni veji. Povezavo do repozitorija in veje, kjer ste reševali nalogo, oddate na spletni učilnici.
 
 **NALOGO MORATE REŠEVATI SAMOSTOJNO. ČE NE VESTE, ALI DOLOČENA STVAR POMENI SODELOVANJE, RAJE VPRAŠAJTE!**
+
+
+
+
+C:\\OCaml64\\usr\\local\\bin\\ocaml-env.exe exec -- C:\\OCaml64\\home\\Jakob\\.opam\\4.12.0+mingw64c\\bin\\ocamlc.exe
