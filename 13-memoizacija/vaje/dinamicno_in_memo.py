@@ -11,6 +11,20 @@ from functools import lru_cache
 # podzaporedje `[2, 3, 4, 4, 6, 7, 8, 9]`.
 # -----------------------------------------------------------------------------
 
+def najdaljse_narascajoce_podazporedje(alist, greatest=0):
+    if not alist:
+        return []
+    else:
+        if (n := alist[0]) >= greatest:
+            # if it's greater we can either take it or not take it
+            vzemi = [n] + najdaljse_narascajoce_podazporedje(alist[1:], n)
+            ne_vzemi = najdaljse_narascajoce_podazporedje(alist[1:], greatest)
+            return max(vzemi, ne_vzemi)
+        else:
+            # if it's smaller we can't take it
+            ne_vzemi = najdaljse_narascajoce_podazporedje(alist[1:], greatest)
+            return ne_vzemi
+print(najdaljse_narascajoce_podazporedje([2, 3, 6, 8, 4, 4, 6, 7, 12, 8, 9]))
 # -----------------------------------------------------------------------------
 # Rešitev sedaj popravite tako, da funkcija `vsa_najdaljsa` vrne seznam vseh
 # najdaljših naraščajočih podzaporedij.
