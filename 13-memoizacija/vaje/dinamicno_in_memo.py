@@ -19,19 +19,46 @@ def najdaljse_narascajoce_podazporedje(alist, greatest=0):
             # if it's greater we can either take it or not take it
             vzemi = [n] + najdaljse_narascajoce_podazporedje(alist[1:], n)
             ne_vzemi = najdaljse_narascajoce_podazporedje(alist[1:], greatest)
-            return max(vzemi, ne_vzemi)
+            if len(vzemi) > len(ne_vzemi):
+                return vzemi
+            else:
+                return ne_vzemi
         else:
             # if it's smaller we can't take it
             ne_vzemi = najdaljse_narascajoce_podazporedje(alist[1:], greatest)
             return ne_vzemi
-print(najdaljse_narascajoce_podazporedje([2, 3, 6, 8, 4, 4, 6, 7, 12, 8, 9]))
+
+x = [2, 3, 6, 8, 4, 4, 6, 7, 12, 8, 9]
+print(f"najdaljse_narascajoce_podzaporedje {x}")
+print(najdaljse_narascajoce_podazporedje(x))
 # -----------------------------------------------------------------------------
 # Rešitev sedaj popravite tako, da funkcija `vsa_najdaljsa` vrne seznam vseh
 # najdaljših naraščajočih podzaporedij.
 # -----------------------------------------------------------------------------
 
+def vsa_najdaljsa(alist, greatest=0):
+    if not alist:
+        return [[]]
+    else:
+        if (n := alist[0]) >= greatest:
+            # if it's greater we can either take it or not take it
+            y = vsa_najdaljsa(alist[1:], n)
+            vzemi = list(map(lambda x = [n] + x, y))
+            ne_vzemi = vsa_najdaljsa(alist[1:], greatest)
 
-
+            if len(vzemi[0]) > len(ne_vzemi[0]):
+                return vzemi
+            elif len(vzemi[0]) < len(ne_vzemi[0]):
+                return ne_vzemi
+            else:
+                return vzemi + ne_vzemi
+        else:
+            # if it's smaller we can't take it
+            ne_vzemi = vsa_najdaljsa(alist[1:], greatest)
+            return ne_vzemi
+x = [2, 3, 6, 8, 4, 4, 6, 7, 12, 8, 9]
+print(f"vsa_najdaljsa {x}")
+print(najdaljse_narascajoce_podazporedje(x))
 # =============================================================================
 # Žabica
 # =============================================================================
